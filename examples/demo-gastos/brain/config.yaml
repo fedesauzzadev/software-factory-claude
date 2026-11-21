@@ -4,8 +4,8 @@ kit_version: 0.1.0
 language: es
 
 commands:
-  test: ["node --test"]
-  run: ["node bin/gastos.js examples/gastos.csv"]
+  test: ["npm test"]
+  run: ["node src/cli.js <archivo.csv>"]
 
 limits:
   max_diff_lines: 300

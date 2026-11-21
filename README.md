@@ -6,14 +6,14 @@ Se instala **por proyecto**, dentro de su `.claude/`. No escribe nada en `~/.cla
 
 ```mermaid
 flowchart LR
-    N([Negocio]) -->|"/factory requerimiento"| I[0 · Intake]
-    I --> PO[1 · PO<br/>producto y MVP]
-    PO --> TL[2 · Tech Lead<br/>plan y slices]
-    TL --> DEV[3 · Dev<br/>slice por slice]
-    DEV --> QA[4 · QA<br/>intenta refutar]
+    N([Negocio]) -->|"/factory requerimiento"| I[Intake]
+    I --> PO[PO<br/>producto y MVP]
+    PO -->|Lite| DEV[Dev<br/>construye y verifica]
+    PO -->|Full| TL[Tech Lead<br/>plan y slices]
+    TL --> DEV
+    DEV --> QA[QA<br/>intenta refutar]
     QA -->|NO-SHIP| DEV
-    QA -->|SHIP| G{{5 · Review gate}}
-    G -->|aprobado: siguiente entrega| DEV
+    QA -->|SHIP| G{{Review gate}}
     G -.->|espera tu decisión| N
 ```
 
@@ -27,33 +27,34 @@ por categoría y el total general, para freelancers que llevan sus cuentas en pl
 Stack impuesto: Node 20, cero dependencias.
 ```
 
-| Fase | Rol | Qué entregó |
-|---|---|---|
-| 0 | orquestador | [`intake.md`](examples/demo-gastos/factory/intake.md) y, como hay dinero de por medio, una división sintetizada: [`division.md`](examples/demo-gastos/factory/division.md) (centavos enteros, nunca silenciosamente mal, CSV hostil) |
-| 1 | PO | [`product.md`](examples/demo-gastos/factory/product.md): MVP de 4 historias, 3 más al roadmap, y 4 [nodos](examples/demo-gastos/brain/nodes) con criterios observables |
-| 2 | Tech Lead | [`plan.md`](examples/demo-gastos/factory/plan.md): 3 slices, y la decisión cara registrada en [`D-0001`](examples/demo-gastos/brain/decisions/D-0001.md) |
-| 3 | Dev ×3 | [código](examples/demo-gastos/src) + [tests](examples/demo-gastos/test): 5 → 11 → 12 tests verdes, cada nodo cerrado con su evidencia |
-| 4 | QA | [`qa-report.md`](examples/demo-gastos/factory/qa-report.md): **SHIP**, 0 críticos, 1 hallazgo menor |
-| 5 | orquestador | el tablero de abajo y la gate |
+Entró como corrida **Lite** (un slice, sin UI, nada irreversible):
+
+| Rol | Qué entregó | Tokens | Tiempo |
+|---|---|---|---|
+| orquestador | [`intake.md`](examples/demo-gastos/factory/intake.md) | — | — |
+| PO | [`product.md`](examples/demo-gastos/factory/product.md) con MVP de 4 historias, 4 [nodos](examples/demo-gastos/brain/nodes) con criterios observables y, como hay dinero de por medio, la división [`division.md`](examples/demo-gastos/factory/division.md) | 41.341 | 119 s |
+| Dev | [código](examples/demo-gastos/src) + [tests](examples/demo-gastos/test) + README, LICENSE y CHANGELOG del producto; 10 tests verdes y los 4 nodos cerrados con evidencia | 33.707 | 107 s |
+| QA | [`qa-report.md`](examples/demo-gastos/factory/qa-report.md): **SHIP** tras unos 25 CSV hostiles, 0 críticos, 2 menores | 21.570 | 56 s |
+| **Total** | 3 lanzamientos, 5 minutos de reloj del intake a la gate | **96.618** | 281 s |
+
+Los tokens son los que reporta Claude Code por subagent; no incluyen al orquestador. El mismo pedido con la versión 0.3 (corrida Full, 6 lanzamientos) costó 273.622. En esta corrida el PO usó haiku; medido aparte en sonnet, que es como quedó, hace lo mismo con 16.274 tokens.
 
 ![Tablero generado por board.mjs en la review gate](docs/board.png)
 
 Lo que el Negocio recibe en la **review gate**, y donde la fábrica se detiene:
 
-> **MVP**: `node bin/gastos.js examples/gastos.csv` imprime el total por categoría y el general, exactos al centavo. Un CSV inválido da `Error: línea n`, código de salida 1 y ningún total.
-> **Verificación**: QA dice SHIP. 12/12 tests. Un hallazgo menor: una categoría con salto de línea entre comillas se imprime en dos líneas. Sin probar: archivos grandes y terminadores `\r` solos.
-> **Roadmap**: filtro por rango de fechas, totales por mes, exportar.
-> **Decisiones para vos**: 1) ¿Aceptar `;` como separador, el que exporta Excel en español? Recomendado: sí, en la próxima entrega. 2) ¿Fechas `DD/MM/AAAA` además de `AAAA-MM-DD`? Recomendado: no por ahora.
+> **MVP**: `node src/cli.js examples/gastos.csv` imprime el total por categoría y el general, exactos al centavo. Un CSV inválido da error con número de línea y ningún total.
+> **Verificación**: QA dice SHIP. 10/10 tests. Dos hallazgos menores: una categoría llamada "Total" se confunde con la línea de total, y los CSV inválidos de prueba viven dentro de los tests. Sin probar: archivos muy grandes.
+> **Roadmap**: V1 filtro por rango de fechas; V2 separador `;` con coma decimal y salida JSON.
+> **Decisiones para vos**: 1) ¿Aceptar `;` y coma decimal, lo que exporta Excel en español, ya en el MVP? Recomendado: sí, es el archivo real de tus usuarios. 2) ¿Rechazar montos negativos (reembolsos)? Recomendado: aceptarlos en V1.
 
 Probalo vos:
 
 ```bash
 cd examples/demo-gastos
-node --test
-node bin/gastos.js examples/gastos.csv
+npm test
+node src/cli.js examples/gastos.csv
 ```
-
-Costo medido de esta corrida: 6 lanzamientos de subagents, unos 274 mil tokens entre todos y cerca de 7 minutos de trabajo de agentes. No incluye los tokens del orquestador.
 
 ## Instalar en un proyecto
 
@@ -67,7 +68,7 @@ node install.mjs <carpeta-del-proyecto> --uninstall  # la quita; brain/ y factor
 Qué deja en `<proyecto>/.claude/`:
 
 ```
-skills/factory/        orquestador (/factory), board.mjs, references/, divisions/
+skills/factory/        orquestador (/factory), nodes.mjs, board.mjs, references/, divisions/
 skills/brainloom/      flujo de build de brainloom-claude
 agents/                factory-po, factory-tech-lead, factory-design, factory-dev, factory-qa
                        + planner, scout, verifier (brainloom-claude)
@@ -99,27 +100,30 @@ Para que funcione:
 /factory                      # estado del proyecto actual
 ```
 
-| Fase | Quién | Entrega |
+| Rol | Cuándo | Entrega |
 |---|---|---|
-| 0 Intake | orquestador | `factory/intake.md`, `brain/` (script, cero tokens), tamaño de corrida, división |
-| 1 Producto | `factory-po` | `factory/product.md`: spec, backlog con corte MVP ≤4, roadmap; nodos `planned` |
-| 2 Plan | `factory-tech-lead` (+ `factory-design` si hay UI) | `factory/plan.md`, decisiones, comandos |
-| 3 Build | `factory-dev`, slice por slice | código + tests + nodos `verified` con evidencia |
-| 4 QA | `factory-qa` | `factory/qa-report.md` con SHIP / NO-SHIP |
-| 5 Gate | orquestador | `factory/board.html` + MVP, verificación, roadmap, decisiones → **espera tu aprobación** |
+| orquestador | siempre | `factory/intake.md`, `brain/` (script, cero tokens), elige corrida Lite o Full |
+| `factory-po` | siempre | `factory/product.md`: spec, backlog con corte MVP ≤4, roadmap; nodos `planned`; división de dominio si aplica |
+| `factory-tech-lead` | Full, o para desbloquear | `factory/plan.md`, decisiones, slices |
+| `factory-design` | Full con UI | `factory/design.md`: flujos, tokens, criterios de usabilidad |
+| `factory-dev` | siempre | código + tests + nodos `verified` con evidencia |
+| `factory-qa` | siempre | `factory/qa-report.md` con SHIP / NO-SHIP |
+| orquestador | gate | `factory/board.html` + MVP, verificación, roadmap, decisiones → **espera tu aprobación** |
+
+**Lite** (por defecto) es `PO → Dev → QA`: todo lo que entra en un slice, sin UI nueva ni nada irreversible. **Full** suma Tech Lead y Design. Si el Dev ve que no entra, devuelve `SPLIT` y la corrida pasa a Full.
 
 ## Dónde ahorra tokens
 
 | Mecanismo | Efecto |
 |---|---|
-| Corrida **Lite** | una historia clara salta PO y Tech Lead: nodo + build + QA |
-| Deltas ruteados por tamaño | cambios refinados o S no pasan por la fábrica |
-| `board.mjs` | el tablero lo genera un script, no el modelo, y solo en la gate o a demanda |
-| Roles devuelven ≤8 líneas | el orquestador no relee ni reescribe artefactos |
-| Un archivo por rol | `product.md`, `plan.md`, `design.md`, `qa-report.md` |
-| Modelo por rol | Tech Lead en opus, el resto en sonnet |
+| Herramientas acotadas por rol | un agent sin lista hereda todas las de la sesión y arranca con un contexto enorme; el test del kit lo impide |
+| Corrida **Lite** por defecto | un solo lanzamiento de Dev, sin Tech Lead |
+| Menos slices en Full | cada lanzamiento de Dev tiene costo fijo; se parte solo si no entra en los límites |
+| Deltas refinados o S | no pasan por la fábrica |
+| `nodes.mjs` y `board.mjs` | los nodos del brain y el tablero los generan scripts, no el modelo |
+| Orquestador que no lee | arma la gate con las ≤6 líneas que devuelve cada rol; un mensaje por fase |
+| Roles que agrupan pasos | leen todo en un mensaje y escriben en otro |
 | QA una vez por MVP | y re-verifica solo lo que falló |
-| Sin Scrum Master ni oficina | el estado sale de `brain/index.md` y `factory/log.md` |
 
 ## Reglas de la casa
 
@@ -127,6 +131,16 @@ Para que funcione:
 - Anti-bloqueo: 3 intentos distintos → Tech Lead → degradar con deuda explícita. Nunca se esconde.
 - Sin DoD vendible (README, LICENSE, tests verdes, sin secrets) no hay SHIP.
 - **Divisiones**: si el dominio lo exige, la fábrica suma gates propios (caché en `divisions/` o síntesis en `factory/division.md`); las que rinden se promueven al kit con tu aprobación.
+
+## Medir una corrida completa
+
+Las cifras de la demo son de los subagents. Para medir todo, orquestador incluido, corré la fábrica sin interfaz en una carpeta vacía con la fábrica instalada; el JSON trae `total_cost_usd`, `modelUsage` y `subagent_stats`:
+
+```bash
+claude -p "/factory <requerimiento>" --model sonnet --output-format json   --permission-mode acceptEdits --allowedTools Bash Read Write Edit Glob Grep Agent Skill > corrida.json
+```
+
+Requiere haber iniciado sesión en la CLI (`claude` y después `/login`).
 
 ## Desarrollar el kit
 
@@ -139,7 +153,7 @@ install.mjs                 instalador y desinstalador por proyecto
 action.yml                  GitHub Action (composite) que corre el instalador
 examples/                   workflow listo para copiar al proyecto destino
 agents/factory-*.md         po, tech-lead, design, dev, qa
-skills/factory/             SKILL.md (orquestador), board.mjs, references/, divisions/
+skills/factory/             SKILL.md (orquestador), nodes.mjs, board.mjs, references/, divisions/
 vendor/brainloom-claude/    copia de brainloom-claude (MIT) que se instala junto
 scripts/test.mjs            self-check (local y CI)
 ```

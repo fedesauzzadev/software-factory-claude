@@ -1,17 +1,24 @@
-# División Finanzas personales (síntesis)
+# División dinero — finanzas personales
+
 ## Detección
-- Gastos, montos, totales, categorías, extractos o planillas de cuentas.
+- Intake con `Dominio: dinero`. Palabras: gastos, montos, totales, saldo, presupuesto, planilla, CSV de cuentas.
+
 ## Énfasis por rol
-- **PO**: el valor es "saber en qué se va la plata"; un total equivocado es peor que ningún total.
-- **Tech Lead**: la representación del dinero es la decisión más cara → decisión dedicada.
-- **QA**: un centavo perdido es un hallazgo Crítico.
+- **PO**: el valor es la confianza en el número. Un total equivocado vale menos que no tener total.
+- **Tech Lead** (solo Full): el decimal debe ser exacto, sin error de punto flotante. La representación la decide él.
+- **QA**: un total incorrecto sin error, o centavos perdidos, son hallazgos críticos. Un CSV malformado que pasa sin error también es crítico.
+
 ## Gates de dominio
-1. **Aritmética exacta**: montos en centavos enteros, nunca float. Sumar 0.10 + 0.20 da exactamente 0.30.
-2. **Nunca silenciosamente mal**: una fila con monto inválido, columna faltante o formato ambiguo se rechaza con número de línea y código de salida distinto de 0; no se saltea ni se suma como 0.
-3. **CSV hostil**: comillas, comas dentro de comillas, BOM, CRLF, líneas vacías y acentos se parsean bien o se rechazan con mensaje.
-4. **Consistencia**: la suma de los totales por categoría es igual al total general.
+1. **D1 Exactitud**: los totales del fixture de ejemplo igualan los valores esperados guardados junto a él.
+2. **D2 Falla cerrada**: cualquier CSV inválido da código distinto de 0 y stdout sin líneas de total.
+3. **D3 Sin redondeo silencioso**: monto con más de dos decimales da error con número de línea.
+4. **D4 Cero pérdida**: 10000 filas de 0.10 suman 1000.00 exacto.
+5. **D5 Determinismo**: dos corridas sobre el mismo archivo dan salida idéntica.
+
 ## DoD de dominio
-- CSV de ejemplo incluido, con su salida esperada en el README.
-- El README dice qué formato de monto se acepta.
+- Fixture válido con total esperado, y un fixture inválido por cada regla de rechazo.
+- Fixture con BOM y CRLF, como sale de una planilla real.
+- README con comando de uso, formato del CSV y glosario: categoría, monto (dos decimales), total.
+
 ## Artefactos de dominio
-- Ninguno extra: la regla de dinero va como decisión en `brain/decisions/`.
+- `factory/division.md` como referencia. En Lite no hay artefacto extra.

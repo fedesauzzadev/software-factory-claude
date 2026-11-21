@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.1.0 - 2026-11-21
-- Totales por categoría y general en centavos exactos.
-- Validación de filas con número de línea; sin totales si hay error.
-- Parser CSV propio (BOM, CRLF, comillas, líneas vacías).
-- README con ejemplo y salida esperada, LICENSE MIT.
+- Total por categoría y total general desde un CSV (`fecha,categoria,monto`).
+- Montos exactos al centavo (enteros, sin punto flotante); sin redondeo silencioso.
+- Falla cerrada: CSV inválido da error con número de línea y ningún total.
+- Acepta BOM UTF-8, CRLF, espacios alrededor de campos y líneas vacías finales.

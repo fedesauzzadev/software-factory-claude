@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0] — 2026-11-21
+
+### Cambió
+- **Nodos por script**: el PO escribe solo `factory/product.md` (y la división) y corre `nodes.mjs`, que crea un nodo por historia MVP y sus filas en `brain/index.md`. Antes escribía cada nodo a mano.
+
+## [0.4.0] — 2026-11-21
+
+Optimización de consumo a partir de las cifras de la primera corrida (274 mil tokens de subagents, 78 % en el Dev).
+
+### Cambió
+- **Dev con herramientas acotadas**: sin lista heredaba todas las de la sesión y arrancaba con un contexto enorme. El test ahora exige `tools:` en todo agent.
+- **Corrida Lite por defecto**: `PO → Dev → QA → gate`, sin Tech Lead, para todo lo que entra en un slice. El Dev devuelve `SPLIT` si no entra y ahí se pasa a Full.
+- **Menos lanzamientos de Dev**: en Full el Tech Lead parte en slices solo si el MVP no entra en `limits`.
+- **Modelos**: Tech Lead en sonnet (opus solo ante algo irreversible). El PO se probó en haiku y se descartó: 41.341 tokens y 119 s contra 16.274 y 75 s en sonnet para la misma tarea.
+- **Medido** con el mismo pedido de la demo: 96.618 tokens en 3 lanzamientos (con el PO todavía en haiku) contra 273.622 en 6 de la versión 0.3.
+- **Menos turnos**: cada rol lee todo en un mensaje y escribe en otro; el orquestador hace un mensaje por fase y no lee artefactos.
+- El PO escribe la división de dominio; se quitó `references/divisions.md`. El Dev ya no lee la skill de brainloom: sus pasos están en su carta.
+
 ## [0.3.0] — 2026-11-21
 
 ### Agregado

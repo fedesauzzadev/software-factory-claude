@@ -6,5 +6,5 @@
 - **Stack**: IMPUESTO — Node 20, cero dependencias.
 - **Constraints**: corre offline; sin instalación más allá de Node.
 - **UI**: no (CLI).
-- **Dominio**: dinero → división Finanzas personales (`factory/division.md`).
-- **Tamaño de corrida**: Full.
+- **Dominio**: dinero (finanzas personales).
+- **Corrida**: Lite.

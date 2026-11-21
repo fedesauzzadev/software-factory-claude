@@ -8,51 +8,50 @@ argument-hint: "[requerimiento]"
 
 Requerimiento del Negocio (literal): $ARGUMENTS
 
-El usuario es el **Negocio**. Vos orquestás la fábrica: encadenás roles, no hacés su trabajo. Todo vive en `.claude/` de este proyecto; nada global.
+El usuario es el **Negocio**. Vos orquestás: encadenás roles, no hacés su trabajo. Todo vive en `.claude/` de este proyecto.
 
 ## Reglas
-1. El Negocio interviene solo en la **review gate** (Fase 5).
+1. El Negocio interviene solo en la **review gate**.
 2. Nada está hecho sin un comando corrido y su resultado observado (`implemented` ≠ `verified`).
-3. Nadie se frena: anti-bloqueo (Fase 3).
-4. **Presupuesto de contexto**: los roles escriben archivos y te devuelven ≤8 líneas. No releas lo que produjeron, no lo reescribas, no narres. Armá la gate con lo que te devolvieron.
-5. Handoff a cada rol, y nada más (su carta ya está en su agent):
-   `Proyecto: <ruta absoluta>. Entrada: <archivos>. Salida: <archivo>.` + `División: factory/division.md` si existe.
-6. Al cerrar cada fase, una línea en `factory/log.md`: `AAAA-MM-DD HH:MM · <rol> · <qué entregó>` (append con shell, sin releer el archivo).
+3. **Tu contexto es el más caro de la fábrica.** No leas código ni artefactos, no construyas, no verifiques: eso es de los roles. Armá la gate con lo que te devolvieron (≤6 líneas cada uno).
+4. **Un mensaje por fase**: la línea de log de la fase que terminó y el lanzamiento del rol siguiente van en el MISMO mensaje, en paralelo.
+5. Handoff, y nada más (la carta del rol ya está en su agent):
+   `Proyecto: <ruta absoluta>. Corrida: <Lite|Full>. Entrada: <archivos>. Salida: <archivo>.`
+6. Log: `factory/log.md`, una línea por fase, append con shell: `AAAA-MM-DD HH:MM · <rol> · <qué entregó>`.
+7. Los agents fijan su modelo. Única excepción: lanzá al Tech Lead con `model: opus` si hay algo irreversible (migración de datos, contrato público).
 
 ## Entrada
-- **Sin requerimiento y existe `factory/`** → estado: `node .claude/skills/factory/board.mjs .`, reportá su salida y pará.
+- **Sin requerimiento y existe `factory/`** → `node .claude/skills/factory/board.mjs .`, reportá su salida y pará.
 - **Sin requerimiento y sin `factory/`** → pedilo en una línea.
-- **Con requerimiento y ya existe `factory/`** → es un delta. Ruteá según el `CLAUDE.md` del proyecto: refinado o S → hacelo directo, sin fábrica; M → un slice (Fase 3 → 4 → 5); L → desde Fase 2.
+- **Con requerimiento y ya existe `factory/`** → es un delta. Refinado o S (según el `CLAUDE.md` del proyecto) → directo, sin fábrica. Si no → corrida Lite o Full sobre el delta.
 - **Con requerimiento, proyecto nuevo** → Fase 0.
 
-## Fase 0 — Intake (vos, sin subagent)
-1. Sin `brain/`: `node .claude/brainloom-claude/init.mjs . --lang es` (script, cero tokens). Código existente desconocido de más de 3 archivos: un `scout`, y su resumen va al intake.
-2. `factory/intake.md`, ≤15 líneas: objetivo, usuarios, éxito observable, stack (impuesto o sugerido), constraints, ¿tiene UI?, dominio.
-3. **Tamaño de corrida**:
-   - **Lite** — una historia clara, sin contratos compartidos ni UI nueva: saltá Fases 1 y 2. Creá el nodo con sus criterios y construilo vos con la skill `brainloom`; después Fase 4 y 5.
-   - **Full** — todo lo demás: Fases 1 a 5.
-4. **División**: solo si el dominio exige estándares propios (dinero, salud, datos personales, ventas, juegos…) → seguí `references/divisions.md`. Sin dominio claro, no fuerces nada.
+## Fase 0 — Intake (vos, un solo mensaje)
+1. Sin `brain/`: `node .claude/brainloom-claude/init.mjs . --lang es`. Código existente desconocido de más de 3 archivos: un `scout`, y su resumen va al intake.
+2. `factory/intake.md`, ≤12 líneas: objetivo, usuarios, éxito observable, stack (impuesto o sugerido), constraints, UI sí/no, `Dominio:` (dinero, salud, datos personales, ventas, juegos… o `ninguno`), `Corrida:`.
+3. **Corrida**:
+   - **Lite** (por defecto): entra en un slice — sin UI nueva, sin contratos compartidos con código existente, nada irreversible. `PO → Dev → QA → gate`. Sin Tech Lead.
+   - **Full**: cualquiera de esas condiciones. `PO → Tech Lead (→ Design si hay UI) → Dev por slice → QA → gate`.
+   - En duda → Lite. Si el Dev devuelve `SPLIT`, pasá a Full: Tech Lead y después Dev por slice.
 
-## Fase 1 — PO (`factory-po`)
-Entrada: `factory/intake.md`. Salida: `factory/product.md` (spec + backlog con corte MVP ≤4 historias + roadmap) y nodos `planned` en el brain.
+## Roles
+| Fase | Agent | Entrada | Salida |
+|---|---|---|---|
+| PO | `factory-po` | `factory/intake.md` | `factory/product.md`, nodos `planned`, y `factory/division.md` si el intake nombra un dominio |
+| Tech Lead (Full) | `factory-tech-lead` | intake + product | `factory/plan.md`, decisiones, comandos |
+| Design (Full, con UI, una vez) | `factory-design` | intake + product + plan | `factory/design.md` |
+| Dev | `factory-dev` | nodos del slice (+ `factory/plan.md` en Full) | código, tests, nodos `verified` |
+| QA (una vez sobre todo el MVP) | `factory-qa` | nodos del MVP | `factory/qa-report.md`: SHIP / NO-SHIP |
 
-## Fase 2 — Tech Lead (`factory-tech-lead`)
-Entrada: intake + product. Salida: `factory/plan.md` (stack, arquitectura, NFRs, slices S01…), decisiones en `brain/decisions/`, comandos en `brain/config.yaml`.
-Si hay UI: `factory-design` UNA vez, antes del primer slice con interfaz → `factory/design.md`. Sin UI no se lanza.
+**Anti-bloqueo**: el Dev devuelve `BLOCKED` tras 3 intentos distintos → `factory-tech-lead` en modo desbloqueo, una vez → Dev retoma. Si tampoco sale: se degrada a lo verificable y el gap va a la gate como deuda explícita.
+**NO-SHIP**: `factory-dev` arregla los críticos → QA re-verifica SOLO eso. Máximo 2 rondas; lo que persista va a la gate como riesgo.
 
-## Fase 3 — Build (`factory-dev`, un slice por vez, secuencial)
-Entrada: `factory/plan.md` + los nodos del slice. El dev sigue el flujo de la skill `brainloom`.
-**Anti-bloqueo**: el dev devuelve `BLOCKED` tras 3 intentos con enfoques distintos → `factory-tech-lead` en modo desbloqueo, una vez → dev retoma. Si tampoco sale: el slice se degrada a lo verificable y el gap va a la gate como deuda explícita. Nunca se esconde.
-
-## Fase 4 — QA (`factory-qa`, una vez sobre todo el MVP)
-Salida: `factory/qa-report.md` con veredicto SHIP / NO-SHIP. Hallazgo crítico → `factory-dev` lo arregla → QA re-verifica SOLO lo que falló. Máximo 2 rondas; lo que persista va a la gate como riesgo.
-
-## Fase 5 — Review gate — STOP
+## Review gate — STOP
 `node .claude/skills/factory/board.mjs .` (genera `factory/board.html`, cero tokens). Presentale al Negocio, compacto:
 1. **MVP**: qué hace + comandos exactos para probarlo.
 2. **Verificación**: veredicto de QA, tests, riesgos y deuda explícita.
 3. **Roadmap** V1/V2.
-4. **Decisiones** numeradas, cada una con tu recomendación (incluí promover la división si fue sintetizada y rindió).
+4. **Decisiones** numeradas, cada una con tu recomendación. Si la división fue sintetizada y rindió: proponé guardarla en `divisions/` del kit.
 5. Ruta de `factory/board.html`.
 
-**No continúes sin aprobación explícita.** Aprobado → siguiente slice o entrega (Fase 3). Rechazado → ajustá lo pedido, repetí Fase 4 y volvé acá.
+**No continúes sin aprobación explícita.** Aprobado → siguiente entrega. Rechazado → ajustá lo pedido, repetí QA y volvé acá.

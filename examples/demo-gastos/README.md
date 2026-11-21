@@ -1,49 +1,45 @@
-# demo-gastos
+# gastos
 
-CLI sin dependencias (Node 20+) que suma tus gastos por categoría desde un CSV, al centavo exacto (centavos enteros, nunca float).
+CLI que lee un CSV de gastos y muestra el total por categoría y el total general, exacto al centavo. Si el CSV es inválido da un error claro y ningún total. Offline, Node 20, cero dependencias.
 
-## Uso (menos de 5 minutos)
+## Probarlo en 5 minutos
 
 ```
-node bin/gastos.js examples/gastos.csv
+node src/cli.js examples/gastos.csv
 ```
 
-Tests: `npm test` (o `node --test`).
+Salida esperada (ver `examples/gastos.expected`):
+
+```
+Comida 20.00
+Software 49.00
+Transporte 3.30
+Total 72.30
+```
+
+Tests: `npm test` (o `node --test test/`).
 
 ## Formato del CSV
 
-Encabezado exacto: `fecha,categoria,monto`. Separador `,`, UTF-8 (BOM, CRLF y LF ok), comillas dobles estilo RFC 4180.
+- Primera línea exactamente `fecha,categoria,monto`.
+- `fecha`: `AAAA-MM-DD` (fecha real).
+- `categoria`: no vacía. Se ignoran mayúsculas y espacios de borde; se muestra la primera escritura.
+- `monto`: número positivo con punto decimal y hasta dos decimales (`5`, `5.5`, `5.50`).
+- Se aceptan BOM UTF-8, finales CRLF, espacios alrededor de los campos y líneas vacías al final. Una línea vacía en el medio es error.
+- Salida: una línea `Categoría monto` por categoría en orden alfabético, y `Total monto`.
 
-- `fecha`: `YYYY-MM-DD`, fecha real de calendario.
-- `categoria`: no vacía; se agrupa tal cual (distingue mayúsculas).
-- `monto`: número con hasta 2 decimales, punto o coma (`12.50`, `"12,50"`), negativo con `-` (resta), `0` válido. Sin separador de miles ni símbolo de moneda. Con coma decimal, el monto va entre comillas.
+## Errores
 
-Cualquier fila inválida aborta con `Error: línea <n>: <motivo>` en stderr, exit 1 y sin totales en stdout. Uso incorrecto: exit 2.
+Cualquier problema (encabezado, fecha, categoría, monto, archivo inexistente) imprime `error: ...` en stderr con la línea y el valor, sale con código distinto de 0 y no imprime ningún total.
 
-## Ejemplo
+## Glosario
 
-`examples/gastos.csv`:
+- **Categoría**: etiqueta de agrupación del gasto.
+- **Monto (dos decimales)**: importe positivo con hasta dos decimales; más decimales se rechazan, nunca se redondean.
+- **Total**: suma exacta de los montos, por categoría o de todo el archivo.
 
-```
-fecha,categoria,monto
-2026-01-03,comida,10.50
-2026-01-04,transporte,3.20
-2026-01-05,comida,0.10
-2026-01-06,comida,0.20
-2026-01-07,ocio,-5
-```
+## Límites
 
-Salida esperada (idéntica a `examples/gastos.expected.txt`, verificada por test):
+Una categoría llamada `Total` se confunde visualmente con la línea de total. Orden alfabético por código de carácter, no por idioma.
 
-```
-comida: 10.80
-transporte: 3.20
-ocio: -5.00
-TOTAL: 9.00
-```
-
-Las categorías salen en orden de primera aparición.
-
-## Licencia
-
-MIT, ver `LICENSE`.
+Licencia MIT.

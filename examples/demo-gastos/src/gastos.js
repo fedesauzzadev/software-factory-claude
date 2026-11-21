@@ -1,18 +1,7 @@
-// Dinero en centavos enteros (D-0001): nunca float.
-const MONTO = /^(-?)(\d+)(?:[.,](\d{1,2}))?$/;
+'use strict';
+const HEADER = 'fecha,categoria,monto';
 
-function parseCents(str) {
-  const m = MONTO.exec(str);
-  if (!m) throw new Error(`monto inválido "${str}"`);
-  const n = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
-  if (!Number.isSafeInteger(n)) throw new Error(`monto fuera de rango "${str}"`);
-  return m[1] ? -n : n;
-}
-
-function formatCents(n) {
-  const abs = Math.abs(n);
-  return `${n < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}
+function fail(line, msg) { throw new Error(line ? `línea ${line}: ${msg}` : msg); }
 
 function validDate(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
@@ -21,24 +10,43 @@ function validDate(s) {
   return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
 }
 
-// records: [{line, fields}] con encabezado primero
-function summarize(records) {
-  const byCategory = new Map();
-  let total = 0;
-  if (!records.length || records[0].fields.join(',') !== 'fecha,categoria,monto') throw new Error(`línea ${records[0]?.line ?? 1}: encabezado esperado fecha,categoria,monto`);
-  for (const { line, fields } of records.slice(1)) {
-    if (fields.length !== 3) throw new Error(`línea ${line}: se esperan 3 columnas`);
-    const [fecha, cat, monto] = fields;
-    if (!validDate(fecha)) throw new Error(`línea ${line}: fecha inválida "${fecha}"`);
-    if (!cat) throw new Error(`línea ${line}: categoría vacía`);
-    let c;
-    try { c = parseCents(monto); } catch (e) { throw new Error(`línea ${line}: ${e.message}`); }
-    const sum = (byCategory.get(cat) ?? 0) + c;
-    total += c;
-    if (!Number.isSafeInteger(sum) || !Number.isSafeInteger(total)) throw new Error(`línea ${line}: suma fuera de rango`);
-    byCategory.set(cat, sum);
-  }
-  return { byCategory, total };
+// Montos como centavos enteros: nunca se usa punto flotante para sumar.
+function parseCents(s, n) {
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) fail(n, `monto inválido "${s}" (se esperan hasta dos decimales con punto)`);
+  const [i, f = ''] = s.split('.');
+  const c = Number(i) * 100 + Number(f.padEnd(2, '0'));
+  if (!Number.isSafeInteger(c)) fail(n, `monto demasiado grande "${s}"`);
+  if (c <= 0) fail(n, `monto debe ser mayor a cero "${s}"`);
+  return c;
 }
 
-module.exports = { parseCents, formatCents, summarize };
+const fmt = (c) => `${Math.floor(c / 100)}.${String(c % 100).padStart(2, '0')}`;
+
+// Devuelve el texto de salida o lanza Error (falla cerrada: nunca un total parcial).
+function summarize(text) {
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
+  while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+  if (lines[0] !== HEADER) fail(0, `encabezado inválido, se esperaba exactamente "${HEADER}"`);
+  const cats = new Map();
+  let total = 0;
+  for (let k = 1; k < lines.length; k++) {
+    const n = k + 1;
+    const f = lines[k].split(',').map((x) => x.trim());
+    if (f.length !== 3) fail(n, `se esperaban 3 campos, hay ${f.length}`);
+    if (!validDate(f[0])) fail(n, `fecha inválida "${f[0]}" (se espera AAAA-MM-DD)`);
+    if (!f[1]) fail(n, 'categoría vacía');
+    const c = parseCents(f[2], n);
+    const key = f[1].toLowerCase();
+    const e = cats.get(key) || { name: f[1], sum: 0 };
+    e.sum += c;
+    cats.set(key, e);
+    total += c;
+    if (!Number.isSafeInteger(total)) fail(n, 'total demasiado grande');
+  }
+  // shortcut: orden por code unit, no por locale; suficiente para determinismo.
+  const out = [...cats.keys()].sort().map((key) => `${cats.get(key).name} ${fmt(cats.get(key).sum)}`);
+  out.push(`Total ${fmt(total)}`);
+  return out.join('\n') + '\n';
+}
+
+module.exports = { summarize, HEADER };

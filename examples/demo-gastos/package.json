@@ -1,8 +1,9 @@
 {
-  "name": "demo-gastos",
+  "name": "gastos",
   "version": "0.1.0",
-  "private": true,
-  "license": "MIT",
-  "bin": { "gastos": "bin/gastos.js" },
-  "scripts": { "test": "node --test" }
+  "description": "Total de gastos por categoría desde un CSV, exacto al centavo.",
+  "bin": { "gastos": "src/cli.js" },
+  "scripts": { "test": "node --test test/gastos.test.js", "start": "node src/cli.js examples/gastos.csv" },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
 }

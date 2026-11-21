@@ -1,118 +1,106 @@
+'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { spawnSync } = require('node:child_process');
-const path = require('node:path');
-const { parseCents, formatCents, summarize } = require('../src/gastos');
-const { parseCsv } = require('../src/csv');
-
-test('0.10 + 0.20 == 0.30 exacto', () => {
-  assert.strictEqual(formatCents(parseCents('0.10') + parseCents('0.20')), '0.30');
-});
-test('coma decimal, negativos, enteros', () => {
-  assert.strictEqual(parseCents('12,5'), 1250);
-  assert.strictEqual(parseCents('-0.05'), -5);
-  assert.strictEqual(parseCents('7'), 700);
-  assert.strictEqual(formatCents(-5), '-0.05');
-  assert.throws(() => parseCents('1.234'));
-  assert.throws(() => parseCents('abc'));
-  assert.throws(() => parseCents('99999999999999999'));
-});
-test('consistencia: suma de categorías == total', () => {
-  for (let s = 1; s <= 50; s++) { // fuzz con semilla fija
-    let x = s;
-    const rnd = () => (x = (x * 48271) % 2147483647);
-    let csv = 'fecha,categoria,monto\n';
-    for (let i = 0; i < 20; i++) csv += `2026-01-01,c${rnd() % 4},${(rnd() % 20000 - 10000) / 100}\n`;
-    const { byCategory, total } = summarize(parseCsv(csv));
-    assert.strictEqual([...byCategory.values()].reduce((a, b) => a + b, 0), total);
-  }
-});
-test('CLI: totales del ejemplo', () => {
-  const r = spawnSync(process.execPath, [path.join(__dirname, '../bin/gastos.js'), path.join(__dirname, '../examples/gastos.csv')], { encoding: 'utf8' });
-  assert.strictEqual(r.status, 0);
-  assert.strictEqual(r.stdout, 'comida: 10.80\ntransporte: 3.20\nocio: -5.00\nTOTAL: 9.00\n');
-});
-test('CLI: monto inválido -> exit 1, stdout vacío, línea', () => {
-  const f = path.join(__dirname, 'bad.csv');
-  require('node:fs').writeFileSync(f, 'fecha,categoria,monto\n2026-01-01,a,1\n2026-01-02,a,x\n');
-  const r = spawnSync(process.execPath, [path.join(__dirname, '../bin/gastos.js'), f], { encoding: 'utf8' });
-  require('node:fs').unlinkSync(f);
-  assert.strictEqual(r.status, 1);
-  assert.strictEqual(r.stdout, '');
-  assert.match(r.stderr, /línea 3/);
-});
-
-// --- S02: validación y CSV hostil ---
 const fs = require('node:fs');
 const os = require('node:os');
-const BIN = path.join(__dirname, '../bin/gastos.js');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const { summarize } = require('../src/gastos');
+
+const CLI = path.join(__dirname, '..', 'src', 'cli.js');
 const H = 'fecha,categoria,monto\n';
-function cli(content) {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'g-')), 'x.csv');
-  fs.writeFileSync(f, content);
-  return spawnSync(process.execPath, [BIN, f], { encoding: 'utf8' });
-}
-function rejects(content, re) {
-  const r = cli(content);
-  assert.notStrictEqual(r.status, 0);
-  assert.strictEqual(r.stdout, '');
-  assert.match(r.stderr, re);
-  assert.doesNotMatch(r.stderr, /\bat \w/); // sin stack
-}
-test('N-0002: monto inválido / vacío / columnas / fecha / encabezado -> línea y stdout vacío', () => {
-  rejects(H + '2026-01-01,a,1\n2026-01-02,a,1.234\n', /^Error: línea 3: monto/);
-  rejects(H + '2026-01-01,a,\n', /^Error: línea 2/);
-  rejects(H + '2026-01-01,a\n', /^Error: línea 2: se esperan 3 columnas/);
-  rejects(H + '2026-01-01,a,1,9\n', /^Error: línea 2: se esperan 3/);
-  rejects(H + '2026-02-30,a,1\n', /^Error: línea 2: fecha/);
-  rejects(H + '2026-01-01,,1\n', /^Error: línea 2: categoría vacía/);
-  rejects('fecha,monto\n', /^Error: línea 1: encabezado/);
-  rejects('', /^Error: línea 1: encabezado/);
-  rejects(H + '2026-01-01,a,99999999999999999\n', /^Error: línea 2/);
-});
-test('N-0002: archivo inexistente y uso', () => {
-  const r = spawnSync(process.execPath, [BIN, path.join(os.tmpdir(), 'no-existe.csv')], { encoding: 'utf8' });
-  assert.strictEqual(r.status, 1);
-  assert.match(r.stderr, /^Error: no se pudo leer /);
-  assert.doesNotMatch(r.stderr, /\bat /);
-  assert.strictEqual(spawnSync(process.execPath, [BIN], { encoding: 'utf8' }).status, 2);
-  assert.strictEqual(spawnSync(process.execPath, [BIN, 'a', 'b'], { encoding: 'utf8' }).status, 2);
-});
-test('N-0003: BOM, CRLF, líneas vacías, acentos', () => {
-  const r = cli('﻿' + H.replace('\n', '\r\n') + '\r\n2026-01-01,café,1.10\r\n   \r\n2026-01-02,café,2,20\r\n'.replace('2,20', '"2,20"') + '2026-01-03,ñandú,-0.30\r\n');
-  assert.strictEqual(r.status, 0, r.stderr);
-  assert.strictEqual(r.stdout, 'café: 3.30\nñandú: -0.30\nTOTAL: 3.00\n');
-});
-test('N-0003: comillas, comas y saltos dentro de comillas, "" escapada', () => {
-  const r = cli(H + '2026-01-01,"comida, afuera",5\n2026-01-02,"a ""b""",1\n2026-01-03,"multi\nlinea",2\n2026-01-04,x,3\n');
-  assert.strictEqual(r.status, 0, r.stderr);
-  assert.strictEqual(r.stdout, 'comida, afuera: 5.00\na "b": 1.00\nmulti\nlinea: 2.00\nx: 3.00\nTOTAL: 11.00\n');
-});
-test('N-0003: comillas sin cerrar -> línea donde abre; línea tras multilínea correcta', () => {
-  rejects(H + '2026-01-01,a,1\n2026-01-02,"abierta,2\n2026-01-03,b,3\n', /^Error: línea 3: comillas sin cerrar/);
-  rejects(H + '2026-01-01,"x\ny",1\n2026-01-02,a,zz\n', /^Error: línea 4: monto/);
-  rejects(H + '2026-01-01,a"b,1\n', /^Error: línea 2: comilla inesperada/);
-  rejects(H + '2026-01-01,"a"b,1\n', /^Error: línea 2: texto después/);
-});
-test('N-0003: fuzz hostil sin tumbar el proceso (semilla fija)', () => {
-  const alphabet = ['"', ',', '\n', '\r\n', 'a', ' ', 'é', '1', '.', '﻿', '-'];
-  let x = 12345;
-  const rnd = () => (x = (x * 48271) % 2147483647);
-  for (let k = 0; k < 500; k++) {
-    let s = '';
-    for (let j = rnd() % 30; j > 0; j--) s += alphabet[rnd() % alphabet.length];
-    try { summarize(parseCsv(s)); } catch (e) { assert.match(e.message, /^línea \d+: /); }
-  }
+const run = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8', timeout: 10000 });
+const tmp = (content) => {
+  const p = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gastos-')), 'x.csv');
+  fs.writeFileSync(p, content);
+  return p;
+};
+const rejects = (csv, re) => assert.throws(() => summarize(csv), re);
+
+test('N-0001 fixture de ejemplo (D1) y determinismo (D5)', () => {
+  const exp = fs.readFileSync(path.join(__dirname, '..', 'examples', 'gastos.expected'), 'utf8');
+  const p = path.join(__dirname, '..', 'examples', 'gastos.csv');
+  const a = run(p), b = run(p);
+  assert.strictEqual(a.status, 0);
+  assert.strictEqual(a.stdout, exp);
+  assert.strictEqual(a.stdout, b.stdout);
 });
 
-test('README: salida real del ejemplo == gastos.expected.txt y está en el README', () => {
-  const root = path.join(__dirname, '..');
-  const r = spawnSync(process.execPath, [path.join(root, 'bin', 'gastos.js'), path.join(root, 'examples', 'gastos.csv')], { encoding: 'utf8' });
-  const fs = require('node:fs');
-  const expected = fs.readFileSync(path.join(root, 'examples', 'gastos.expected.txt'), 'utf8');
+test('N-0001 solo encabezado da Total 0.00 y exit 0', () => {
+  const r = run(tmp(H));
   assert.strictEqual(r.status, 0);
-  assert.strictEqual(r.stdout, expected);
-  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.ok(readme.includes(expected.trimEnd()), 'README contiene la salida esperada exacta');
-  assert.match(readme, /monto/i);
+  assert.strictEqual(r.stdout, 'Total 0.00\n');
+});
+
+test('N-0001 categorías en orden alfabético', () => {
+  assert.strictEqual(summarize(H + '2026-01-01,b,1\n2026-01-01,a,2\n'), 'a 2.00\nb 1.00\nTotal 3.00\n');
+});
+
+test('N-0002 CSV inválido: exit != 0, sin total en stdout (D2)', () => {
+  const bad = ['fecha,monto,categoria\n', H + '2026-13-01,a,1\n', H + '26-01-01,a,1\n', H + '2026-01-01,,1\n',
+    H + '2026-01-01,a\n', H + '2026-01-01,a,1\n\n2026-01-01,a,1\n', ''];
+  for (const c of bad) {
+    const r = run(tmp(c));
+    assert.notStrictEqual(r.status, 0, JSON.stringify(c));
+    assert.doesNotMatch(r.stdout, /Total/);
+    assert.match(r.stderr, /error/);
+  }
+  rejects('x\n', /fecha,categoria,monto/);
+  rejects(H + 'ok\n', /línea 2/);
+  rejects(H + '2026-01-01,a,1\n2026-02-30,a,1\n', /línea 3.*fecha/);
+  rejects(H + '2026-01-01,,1\n', /línea 2.*categoría/);
+});
+
+test('N-0002 ruta inexistente', () => {
+  const r = run('no-existe.csv');
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, /no-existe\.csv/);
+  assert.strictEqual(r.stdout, '');
+  assert.notStrictEqual(run().status, 0);
+});
+
+test('N-0003 montos válidos', () => {
+  assert.strictEqual(summarize(H + '2026-01-01,a,5\n2026-01-01,b,5.5\n2026-01-01,c,5.50\n'), 'a 5.00\nb 5.50\nc 5.50\nTotal 16.00\n');
+  assert.strictEqual(summarize(H + '2026-01-01,a,0.1\n2026-01-01,a,0.2\n'), 'a 0.30\nTotal 0.30\n');
+});
+
+test('N-0003 montos rechazados con línea y valor (D3)', () => {
+  for (const v of ['12.345', 'abc', '0', '0.00', '-5', '', '1e3', '.5', '5.', '99999999999999999']) {
+    rejects(H + '2026-01-01,a,1\n' + `2026-01-01,a,${v}\n`, new RegExp('línea 3.*"' + v.replace('.', '\\.') + '"'));
+  }
+  rejects(H + '2026-01-01,a,12,50\n', /línea 2/); // coma decimal sin comillas: campo de más
+  rejects(H + '2026-01-01,a,"12,50"\n', /línea 2/);
+});
+
+test('N-0003 10000 filas de 0.10 suman 1000.00 (D4)', () => {
+  const r = run(tmp(H + '2026-01-01,a,0.10\n'.repeat(10000)));
+  assert.strictEqual(r.stdout, 'a 1000.00\nTotal 1000.00\n');
+});
+
+test('N-0004 BOM, CRLF, espacios, líneas vacías finales', () => {
+  const lf = H + '2026-01-01,Comida,10\n2026-01-02,comida ,2.5\n';
+  const base = summarize(lf);
+  assert.strictEqual(base, 'Comida 12.50\nTotal 12.50\n');
+  assert.strictEqual(summarize('﻿' + lf.replace(/\n/g, '\r\n')), base);
+  assert.strictEqual(summarize(lf + '\n\n  \n'), base);
+  assert.strictEqual(summarize(H + ' 2026-01-01 , Comida , 10 \n2026-01-02,COMIDA,2.5\n'), base);
+  const r = run(tmp('﻿' + lf.replace(/\n/g, '\r\n')));
+  assert.strictEqual(r.stdout, base);
+});
+
+test('fuzz con seed fija: o error o total igual a la referencia', () => {
+  let s = 12345;
+  const rnd = (n) => ((s = (s * 1103515245 + 12345) & 0x7fffffff) % n);
+  const pick = (a) => a[rnd(a.length)];
+  const amounts = ['1', '2.5', '0.10', '3.33', '12.345', 'abc', '-1', '', '1,5', '9'.repeat(30)];
+  const dates = ['2026-01-01', '2026-02-29', 'x', ''];
+  const cats = ['a', 'A ', 'b', ''];
+  for (let i = 0; i < 300; i++) {
+    const rows = Array.from({ length: rnd(6) }, () => [pick(dates), pick(cats), pick(amounts)].join(pick([',', ',', ',,'])));
+    let out;
+    try { out = summarize(H + rows.join(pick(['\n', '\r\n'])) + pick(['', '\n', '\n\n'])); } catch (e) { assert.ok(e instanceof Error); continue; }
+    const exp = rows.reduce((t, r) => t + Math.round(parseFloat(r.split(',')[2]) * 100), 0);
+    assert.match(out, new RegExp(`Total ${Math.floor(exp / 100)}\\.${String(exp % 100).padStart(2, '0')}\\n$`));
+  }
+  for (const huge of ['', '\0'.repeat(10), H + 'x'.repeat(1e6)]) rejects(huge, /./);
 });

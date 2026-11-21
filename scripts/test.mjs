@@ -30,6 +30,7 @@ for (const f of agentFiles) {
   assert.equal(/^name: (.*)$/m.exec(fm)?.[1], f.replace(/\.md$/, ""), `${f}: name must match filename`);
   assert.match(fm, /^description: \S/m, `${f}: description`);
   assert.match(fm, /^model: (haiku|sonnet|opus)$/m, `${f}: model`);
+  assert.match(fm, /^tools: \S/m, `${f}: tools must be listed (an agent without it inherits every session tool and starts with a huge context)`);
   assert.ok(!text.includes("~/.claude"), `${f}: must not point at the global config`);
 }
 assert.ok(!skill.includes("~/.claude"), "SKILL.md must not point at the global config");
@@ -62,6 +63,21 @@ try {
   node(join(cfg, "brainloom-claude", "init.mjs"), proj, "--lang", "es");
   assert.match(readFileSync(join(proj, "brain", "config.yaml"), "utf8"), /^language: es$/m, "brain/ created by installed init.mjs");
   assert.ok(existsSync(join(proj, "CLAUDE.md")), "CLAUDE.md created");
+
+  // 3b. nodes.mjs: MVP stories become valid brain nodes; rows below the cut are ignored; re-running adds nothing.
+  put(join(proj, "factory", "product.md"), [
+    "| ID | historia | criterios | valor | tamaño |", "|---|---|---|---|---|",
+    '| H-01 | Ver "totales" por categoría | dado un CSV válido, imprime un total por categoría<br>el total general es la suma | Alto | S |',
+    "| H-02 | Rechazar CSV inválido | una fila inválida da error con número de línea | Alto | M |",
+    "| === CORTE MVP === | | | | |",
+    "| H-03 | Exportar | genera JSON | Bajo | L |", ""].join("\n"));
+  const nodesJs = join(cfg, "skills", "factory", "nodes.mjs");
+  assert.match(node(nodesJs, proj), /N-0001 · H-01 · S · 2 criterios\r?\nN-0002 · H-02 · M · 1 criterios/);
+  assert.deepEqual(readdirSync(join(proj, "brain", "nodes")), ["N-0001.md", "N-0002.md"], "one node per MVP story, none below the cut");
+  const n1 = readFileSync(join(proj, "brain", "nodes", "N-0001.md"), "utf8");
+  assert.ok(n1.includes("status: planned") && n1.includes('  - "el total general es la suma"'), "node carries status and criteria");
+  assert.match(node(nodesJs, proj), /H-01 ya tiene nodo/, "re-run skips existing stories");
+  assert.equal(readdirSync(join(proj, "brain", "nodes")).length, 2, "re-run creates nothing");
 
   // 4. Board: renders from brain/ + factory/, escapes content, reports status.
   put(join(proj, "brain", "index.md"), "## Nodes\n| id | title | type | size | status |\n|---|---|---|---|---|\n| N-0001 | <script>alert(1)</script> | feature | M | verified |\n| N-0002 | Export CSV | feature | S | planned |\n");
