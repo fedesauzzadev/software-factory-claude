@@ -19,6 +19,8 @@ flowchart LR
 
 ## Demo: una corrida real
 
+Versión navegable de esta demo: [`docs/index.html`](docs/index.html) (una sola página, sin dependencias; lista para GitHub Pages desde `/docs`).
+
 Todo lo de [`examples/demo-gastos/`](examples/demo-gastos) lo produjo la fábrica a partir de este pedido, sin intervención hasta la gate:
 
 ```
