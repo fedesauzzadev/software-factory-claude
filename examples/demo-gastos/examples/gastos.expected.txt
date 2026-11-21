@@ -1,0 +1,4 @@
+comida: 10.80
+transporte: 3.20
+ocio: -5.00
+TOTAL: 9.00

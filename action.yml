@@ -1,0 +1,13 @@
+name: Install Software Factory
+description: Instala la software factory (skill /factory, agents factory-* y brainloom-claude) dentro de .claude/ del proyecto. No commitea.
+inputs:
+  path:
+    description: Carpeta del proyecto donde instalar
+    default: "."
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TARGET: ${{ inputs.path }}
+      run: node "$GITHUB_ACTION_PATH/install.mjs" "$TARGET"

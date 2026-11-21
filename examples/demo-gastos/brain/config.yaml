@@ -1,0 +1,12 @@
+# brainloom-claude instance config (per project)
+schema_version: 2
+kit_version: 0.1.0
+language: es
+
+commands:
+  test: ["node --test"]
+  run: ["node bin/gastos.js examples/gastos.csv"]
+
+limits:
+  max_diff_lines: 300
+  max_files: 8

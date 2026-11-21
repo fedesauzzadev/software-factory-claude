@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>demo-gastos — factory board</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f5f2;--card:#fff;--fg:#1c1b19;--mut:#6b6862;--line:#dcd9d2;--ok:#1f7a4d;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#161614;--card:#211f1c;--fg:#ecebe7;--mut:#a09c94;--line:#38352f;--ok:#5fcf97;--bad:#ff8a80}}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1100px;margin:auto}h1{margin:0;font-size:22px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:28px 0 8px}
+.meta{color:var(--mut)}.v{font-weight:700}.SHIP{color:var(--ok)}.NO-SHIP{color:var(--bad)}
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.col{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px}
+.col h3{margin:0 0 8px;font-size:13px;color:var(--mut)}ul{margin:0;padding-left:18px}.col ul{list-style:none;padding:0}
+.col li{border-top:1px solid var(--line);padding:6px 0}.id{font:12px ui-monospace,monospace;color:var(--mut);display:block}
+</style></head><body><main>
+<h1>demo-gastos</h1>
+<p class="meta">División Finanzas personales (síntesis) · generado 2026-11-21 16:27 UTC · QA: <span class="v SHIP">SHIP</span></p>
+<h2>Nodos</h2>
+<div class="board"><section class="col"><h3>planned (0)</h3><ul><li>—</li></ul></section><section class="col"><h3>in-progress (0)</h3><ul><li>—</li></ul></section><section class="col"><h3>implemented (0)</h3><ul><li>—</li></ul></section><section class="col"><h3>verified (4)</h3><ul><li><span class="id">N-0001 · M</span>Ver totales por categoría y general (H-01)</li><li><span class="id">N-0002 · S</span>Rechazar CSV inválido sin dar totales (H-02)</li><li><span class="id">N-0003 · M</span>Leer CSV exportados de planillas reales (H-03)</li><li><span class="id">N-0004 · S</span>Guía y ejemplo de uso (H-04)</li></ul></section><section class="col"><h3>shipped (0)</h3><ul><li>—</li></ul></section></div>
+<h2>Actividad</h2><ul><li>2026-11-21 13:19 · orquestador · intake + división Finanzas personales (síntesis), corrida Full</li><li>2026-11-21 13:20 · po · product.md: MVP de 4 historias (H-01 a H-04), nodos N-0001 a N-0004</li><li>2026-11-21 13:21 · tech-lead · plan.md (S01-S03), D-0001 dinero en centavos, commands</li><li>2026-11-21 13:22 · dev · S01 verificado: N-0001, node --test 5/5</li><li>2026-11-21 13:25 · dev · S02 verificado: N-0002 y N-0003, node --test 11/11</li><li>2026-11-21 13:26 · dev · S03 verificado: N-0004, node --test 12/12, README + LICENSE + CHANGELOG</li><li>2026-11-21 13:27 · qa · SHIP: 12/12 tests, 0 críticos, 1 menor</li><li>2026-11-21 13:27 · orquestador · review gate abierta: espera al Negocio</li></ul>
+<h2>Decisiones</h2><ul><li>D-0001 — Dinero como centavos enteros (Number safe integer), parseo por regex estricta</li></ul>
+</main></body></html>

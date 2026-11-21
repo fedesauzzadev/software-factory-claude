@@ -1,0 +1,23 @@
+# Copiá este archivo a .github/workflows/install-factory.yml del proyecto destino.
+# Actions → "Install software factory" → Run workflow (elegí la rama): instala o
+# actualiza la fábrica en .claude/ y commitea en esa rama. Sin cambios, no commitea.
+name: Install software factory
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Fijá un tag o SHA en lugar de @main para congelar la versión del kit.
+      - uses: fedesauzzadev/software-factory-claude@main
+      - name: Commit
+        run: |
+          git add .claude
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: instala/actualiza software factory"
+          git push
